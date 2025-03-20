@@ -1,0 +1,38 @@
+{
+  "Records": [
+    {
+      "eventVersion": "2.1",
+      "eventSource": "aws:s3",
+      "awsRegion": "us-east-1",
+      "eventTime": "2024-07-23T17:19:58.292Z",
+      "eventName": "ObjectCreated:Put",
+      "userIdentity": {
+        "principalId": "AWS:AROAQEFWA5HLX4WHTAPUF:jmgomez-Isengard"
+      },
+      "requestParameters": {
+        "sourceIPAddress": "72.21.198.71"
+      },
+      "responseElements": {
+        "x-amz-request-id": "YCGZMEDYBCQ169H0",
+        "x-amz-id-2": "lBv6aa80LhS/hOTUi9fIanCN2P6NO66BLC5+r8xpuY/3fz3/QZQ2nbqrGTI+NFU+lPWeBRQXfyEE0nnbrzyPxCXU+vfrz7Cw"
+      },
+      "s3": {
+        "s3SchemaVersion": "1.0",
+        "configurationId": "68e0f02e-1456-496d-ae6f-127db5ab6957",
+        "bucket": {
+          "name": "jmgm-rag-datathon",
+          "ownerIdentity": {
+            "principalId": "AOXYWQ450M1K5"
+          },
+          "arn": "arn:aws:s3:::jmgm-rag-datathon"
+        },
+        "object": {
+          "key": "uploads/tarjeta-visa-coconut.pdf",
+          "size": 438336,
+          "eTag": "41ae64383583d869db96083b6763e74f",
+          "sequencer": "00669FE63E2D58654B"
+        }
+      }
+    }
+  ]
+}

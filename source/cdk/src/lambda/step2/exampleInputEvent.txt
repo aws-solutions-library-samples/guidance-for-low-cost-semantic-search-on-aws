@@ -1,0 +1,5 @@
+{
+  "Status": 200,
+  "JobID": "35b6708c7cc328117fc80620c757905d721ad2b22b35540fa0b4352fb6e909d6",
+  "Output": "s3://jmgm-rag-datathon/raw_json/5250295a-169d-4135-8632-704b8eeff747_tarjeta-visa-coconut_textract.json"
+}

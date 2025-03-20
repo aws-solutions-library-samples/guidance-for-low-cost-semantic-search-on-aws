@@ -1,0 +1,154 @@
+{
+  "StartAt": "ReadDocsTask",
+  "States": {
+    "ReadDocsTask": {
+      "Next": "ListObjects_pages",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ClientExecutionTimeoutException",
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 6,
+          "BackoffRate": 2
+        }
+      ],
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "__READDOCS__",
+        "Payload.$": "$"
+      },
+      "ResultPath": "$.InitialInput"
+    },
+    "ListObjects_pages": {
+      "Type": "Task",
+      "Parameters": {
+        "Bucket.$": "$.detail.bucket.name",
+        "Prefix.$": "States.Format('{}_', $.InitialInput.Payload.pages_prefix)"
+      },
+      "Resource": "arn:aws:states:::aws-sdk:s3:listObjectsV2",
+      "Next": "Map_pages",
+      "ResultPath": "$.s3objects"
+    },
+    "Map_pages": {
+      "Type": "Map",
+      "ItemProcessor": {
+        "ProcessorConfig": {
+          "Mode": "INLINE"
+        },
+        "StartAt": "ProcessSplit",
+        "States": {
+          "ProcessSplit": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::lambda:invoke",
+            "OutputPath": "$.Payload",
+            "Parameters": {
+              "Payload.$": "$",
+              "FunctionName": "__PAGEPROCESS__:$LATEST"
+            },
+            "Retry": [
+              {
+                "ErrorEquals": [
+                  "Lambda.ServiceException",
+                  "Lambda.AWSLambdaException",
+                  "Lambda.SdkClientException",
+                  "Lambda.TooManyRequestsException"
+                ],
+                "IntervalSeconds": 1,
+                "MaxAttempts": 3,
+                "BackoffRate": 2,
+                "JitterStrategy": "FULL"
+              }
+            ],
+            "End": true
+          }
+        }
+      },
+      "ItemsPath": "$.s3objects.Contents",
+      "ItemSelector": {
+        "Bucket.$": "$.detail.bucket.name",
+        "Key.$": "$$.Map.Item.Value.Key"
+      },
+      "Next": "JoinerLLM",
+      "ResultPath": null
+    },
+    "JoinerLLM": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "OutputPath": "$.Payload",
+      "Parameters": {
+        "FunctionName": "__RAWDATAJOINER__:$LATEST",
+        "Payload": {
+          "Prefix.$": "$.InitialInput.Payload.pages_prefix"
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3,
+          "BackoffRate": 2,
+          "JitterStrategy": "FULL"
+        }
+      ],
+      "Next": "ChunkRawDataTask"
+    },
+    "ChunkRawDataTask": {
+      "Next": "StoreChunkDynamoTask",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ClientExecutionTimeoutException",
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 6,
+          "BackoffRate": 2
+        }
+      ],
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "__CHUNKRAWDATA__",
+        "Payload": {
+          "Payload": {
+            "Output.$": "States.Format('s3://{}/{}', $.bucket, $.output_key)"
+          }
+        }
+      }
+    },
+    "StoreChunkDynamoTask": {
+      "End": true,
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ClientExecutionTimeoutException",
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 6,
+          "BackoffRate": 2
+        }
+      ],
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "__STORECHUNKDYNAMO__",
+        "Payload.$": "$"
+      }
+    }
+  }
+}

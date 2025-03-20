@@ -1,0 +1,500 @@
+{
+    "Comment": "A description of my state machine",
+    "StartAt": "DynamoDB GetItem",
+    "States": {
+      "DynamoDB GetItem": {
+        "Type": "Task",
+        "Resource": "arn:aws:states:::dynamodb:getItem",
+        "Parameters": {
+          "TableName.$": "$.documentTable",
+          "Key": {
+            "group": {
+              "S.$": "$.group"
+            },
+            "filename": {
+              "S.$": "$.filename"
+            }
+          }
+        },
+        "ResultPath": "$.InitialInput",
+        "Next": "Parallel"
+      },
+      "Parallel": {
+        "Type": "Parallel",
+        "Next": "DynamoDB DeleteItem",
+        "Branches": [
+          {
+            "StartAt": "ListObjects_rag",
+            "States": {
+              "ListObjects_rag": {
+                "Type": "Task",
+                "Parameters": {
+                  "Bucket.$": "$.fileStoreBucketName",
+                  "Prefix.$": "States.Format('rag/{}/{}_', $.InitialInput.Item.group.S, $.InitialInput.Item.uuid.S)"
+                },
+                "Resource": "arn:aws:states:::aws-sdk:s3:listObjectsV2",
+                "ResultPath": "$.s3objects",
+                "Next": "Map_rag"
+              },
+              "Map_rag": {
+                "Type": "Map",
+                "ItemProcessor": {
+                  "ProcessorConfig": {
+                    "Mode": "INLINE"
+                  },
+                  "StartAt": "DeleteObject",
+                  "States": {
+                    "DeleteObject": {
+                      "Type": "Task",
+                      "Parameters": {
+                        "Bucket.$": "$.Bucket",
+                        "Key.$": "$.Key"
+                      },
+                      "Resource": "arn:aws:states:::aws-sdk:s3:deleteObject",
+                      "End": true
+                    }
+                  }
+                },
+                "ItemsPath": "$.s3objects.Contents",
+                "ItemSelector": {
+                  "Bucket.$": "$.fileStoreBucketName",
+                  "Key.$": "$$.Map.Item.Value.Key"
+                },
+                "ResultPath": null,
+                "Next": "Choice_rag"
+              },
+              "Choice_rag": {
+                "Type": "Choice",
+                "Choices": [
+                  {
+                    "Variable": "$.s3objects.IsTruncated",
+                    "BooleanEquals": false,
+                    "Next": "Success_rag"
+                  }
+                ],
+                "Default": "ListObjectsV2_paginate_rag"
+              },
+              "Success_rag": {
+                "Type": "Succeed"
+              },
+              "ListObjectsV2_paginate_rag": {
+                "Type": "Task",
+                "Parameters": {
+                  "ContinuationToken.$": "$.s3_objects.NextContinuationToken",
+                  "Bucket.$": "$.fileStoreBucketName",
+                  "Prefix.$": "States.Format('rag/{}/{}_', $.InitialInput.Item.group.S, $.InitialInput.Item.uuid.S)"
+                },
+                "Resource": "arn:aws:states:::aws-sdk:s3:listObjectsV2",
+                "Next": "Map_rag"
+              }
+            }
+          },
+          {
+            "StartAt": "ListObjects_pages",
+            "States": {
+              "ListObjects_pages": {
+                "Type": "Task",
+                "Parameters": {
+                  "Bucket.$": "$.fileStoreBucketName",
+                  "Prefix.$": "States.Format('pages/{}/{}_', $.InitialInput.Item.group.S, $.InitialInput.Item.uuid.S)"
+                },
+                "Resource": "arn:aws:states:::aws-sdk:s3:listObjectsV2",
+                "ResultPath": "$.s3objects",
+                "Next": "Map_pages"
+              },
+              "Map_pages": {
+                "Type": "Map",
+                "ItemProcessor": {
+                  "ProcessorConfig": {
+                    "Mode": "INLINE"
+                  },
+                  "StartAt": "DeleteObject_pages",
+                  "States": {
+                    "DeleteObject_pages": {
+                      "Type": "Task",
+                      "Parameters": {
+                        "Bucket.$": "$.Bucket",
+                        "Key.$": "$.Key"
+                      },
+                      "Resource": "arn:aws:states:::aws-sdk:s3:deleteObject",
+                      "End": true
+                    }
+                  }
+                },
+                "ItemsPath": "$.s3objects.Contents",
+                "ItemSelector": {
+                  "Bucket.$": "$.fileStoreBucketName",
+                  "Key.$": "$$.Map.Item.Value.Key"
+                },
+                "ResultPath": null,
+                "Next": "Choice_pages"
+              },
+              "Choice_pages": {
+                "Type": "Choice",
+                "Choices": [
+                  {
+                    "Variable": "$.s3objects.IsTruncated",
+                    "BooleanEquals": false,
+                    "Next": "Success_pages"
+                  }
+                ],
+                "Default": "ListObjectsV2_paginate_pages"
+              },
+              "Success_pages": {
+                "Type": "Succeed"
+              },
+              "ListObjectsV2_paginate_pages": {
+                "Type": "Task",
+                "Parameters": {
+                  "ContinuationToken.$": "$.s3_objects.NextContinuationToken",
+                  "Bucket.$": "$.fileStoreBucketName",
+                  "Prefix.$": "States.Format('pages/{}/{}_', $.InitialInput.Item.group.S, $.InitialInput.Item.uuid.S)"
+                },
+                "Resource": "arn:aws:states:::aws-sdk:s3:listObjectsV2",
+                "Next": "Map_pages"
+              }
+            }
+          },
+          {
+            "StartAt": "ListObjects_pages_processed",
+            "States": {
+              "ListObjects_pages_processed": {
+                "Type": "Task",
+                "Parameters": {
+                  "Bucket.$": "$.fileStoreBucketName",
+                  "Prefix.$": "States.Format('pages_processed/{}/{}_', $.InitialInput.Item.group.S, $.InitialInput.Item.uuid.S)"
+                },
+                "Resource": "arn:aws:states:::aws-sdk:s3:listObjectsV2",
+                "ResultPath": "$.s3objects",
+                "Next": "Map_pages_processed"
+              },
+              "Map_pages_processed": {
+                "Type": "Map",
+                "ItemProcessor": {
+                  "ProcessorConfig": {
+                    "Mode": "INLINE"
+                  },
+                  "StartAt": "DeleteObject_pages_processed",
+                  "States": {
+                    "DeleteObject_pages_processed": {
+                      "Type": "Task",
+                      "Parameters": {
+                        "Bucket.$": "$.Bucket",
+                        "Key.$": "$.Key"
+                      },
+                      "Resource": "arn:aws:states:::aws-sdk:s3:deleteObject",
+                      "End": true
+                    }
+                  }
+                },
+                "ItemsPath": "$.s3objects.Contents",
+                "ItemSelector": {
+                  "Bucket.$": "$.fileStoreBucketName",
+                  "Key.$": "$$.Map.Item.Value.Key"
+                },
+                "ResultPath": null,
+                "Next": "Choice_pages_processed"
+              },
+              "Choice_pages_processed": {
+                "Type": "Choice",
+                "Choices": [
+                  {
+                    "Variable": "$.s3objects.IsTruncated",
+                    "BooleanEquals": false,
+                    "Next": "Success_pages_processed"
+                  }
+                ],
+                "Default": "ListObjectsV2_paginate_pages_processed"
+              },
+              "Success_pages_processed": {
+                "Type": "Succeed"
+              },
+              "ListObjectsV2_paginate_pages_processed": {
+                "Type": "Task",
+                "Parameters": {
+                  "ContinuationToken.$": "$.s3_objects.NextContinuationToken",
+                  "Bucket.$": "$.fileStoreBucketName",
+                  "Prefix.$": "States.Format('pages_processed/{}/{}_', $.InitialInput.Item.group.S, $.InitialInput.Item.uuid.S)"
+                },
+                "Resource": "arn:aws:states:::aws-sdk:s3:listObjectsV2",
+                "Next": "Map_pages_processed"
+              }
+            }
+          },
+          {
+            "StartAt": "ListObjects_raw_text",
+            "States": {
+              "ListObjects_raw_text": {
+                "Type": "Task",
+                "Parameters": {
+                  "Bucket.$": "$.fileStoreBucketName",
+                  "Prefix.$": "States.Format('raw_text/{}/{}_', $.InitialInput.Item.group.S, $.InitialInput.Item.uuid.S)"
+                },
+                "Resource": "arn:aws:states:::aws-sdk:s3:listObjectsV2",
+                "ResultPath": "$.s3objects",
+                "Next": "Map_raw_text"
+              },
+              "Map_raw_text": {
+                "Type": "Map",
+                "ItemProcessor": {
+                  "ProcessorConfig": {
+                    "Mode": "INLINE"
+                  },
+                  "StartAt": "DeleteObject_raw_text",
+                  "States": {
+                    "DeleteObject_raw_text": {
+                      "Type": "Task",
+                      "Parameters": {
+                        "Bucket.$": "$.Bucket",
+                        "Key.$": "$.Key"
+                      },
+                      "Resource": "arn:aws:states:::aws-sdk:s3:deleteObject",
+                      "End": true
+                    }
+                  }
+                },
+                "ItemsPath": "$.s3objects.Contents",
+                "ItemSelector": {
+                  "Bucket.$": "$.fileStoreBucketName",
+                  "Key.$": "$$.Map.Item.Value.Key"
+                },
+                "ResultPath": null,
+                "Next": "Choice_raw_text"
+              },
+              "Choice_raw_text": {
+                "Type": "Choice",
+                "Choices": [
+                  {
+                    "Variable": "$.s3objects.IsTruncated",
+                    "BooleanEquals": false,
+                    "Next": "Success_raw_text"
+                  }
+                ],
+                "Default": "ListObjectsV2_paginate_raw_text"
+              },
+              "Success_raw_text": {
+                "Type": "Succeed"
+              },
+              "ListObjectsV2_paginate_raw_text": {
+                "Type": "Task",
+                "Parameters": {
+                  "ContinuationToken.$": "$.s3_objects.NextContinuationToken",
+                  "Bucket.$": "$.fileStoreBucketName",
+                  "Prefix.$": "States.Format('rag/{}/{}_', $.InitialInput.Item.group.S, $.InitialInput.Item.uuid.S)"
+                },
+                "Resource": "arn:aws:states:::aws-sdk:s3:listObjectsV2",
+                "Next": "Map_raw_text"
+              }
+            }
+          },
+          {
+            "StartAt": "ListObjects_raw_json",
+            "States": {
+              "ListObjects_raw_json": {
+                "Type": "Task",
+                "Parameters": {
+                  "Bucket.$": "$.fileStoreBucketName",
+                  "Prefix.$": "States.Format('raw_json/{}/{}_', $.InitialInput.Item.group.S, $.InitialInput.Item.uuid.S)"
+                },
+                "Resource": "arn:aws:states:::aws-sdk:s3:listObjectsV2",
+                "ResultPath": "$.s3objects",
+                "Next": "Map_raw_json"
+              },
+              "Map_raw_json": {
+                "Type": "Map",
+                "ItemProcessor": {
+                  "ProcessorConfig": {
+                    "Mode": "INLINE"
+                  },
+                  "StartAt": "DeleteObject_raw_json",
+                  "States": {
+                    "DeleteObject_raw_json": {
+                      "Type": "Task",
+                      "Parameters": {
+                        "Bucket.$": "$.Bucket",
+                        "Key.$": "$.Key"
+                      },
+                      "Resource": "arn:aws:states:::aws-sdk:s3:deleteObject",
+                      "End": true
+                    }
+                  }
+                },
+                "ItemsPath": "$.s3objects.Contents",
+                "ItemSelector": {
+                  "Bucket.$": "$.fileStoreBucketName",
+                  "Key.$": "$$.Map.Item.Value.Key"
+                },
+                "ResultPath": null,
+                "Next": "Choice_raw_json"
+              },
+              "Choice_raw_json": {
+                "Type": "Choice",
+                "Choices": [
+                  {
+                    "Variable": "$.s3objects.IsTruncated",
+                    "BooleanEquals": false,
+                    "Next": "Success_raw_json"
+                  }
+                ],
+                "Default": "ListObjectsV2_paginate_raw_json"
+              },
+              "Success_raw_json": {
+                "Type": "Succeed"
+              },
+              "ListObjectsV2_paginate_raw_json": {
+                "Type": "Task",
+                "Parameters": {
+                  "ContinuationToken.$": "$.s3_objects.NextContinuationToken",
+                  "Bucket.$": "$.fileStoreBucketName",
+                  "Prefix.$": "States.Format('rag/{}/{}_', $.InitialInput.Item.group.S, $.InitialInput.Item.uuid.S)"
+                },
+                "Resource": "arn:aws:states:::aws-sdk:s3:listObjectsV2",
+                "Next": "Map_raw_json"
+              }
+            }
+          },
+          {
+            "StartAt": "DeleteObject_raw_docs",
+            "States": {
+              "DeleteObject_raw_docs": {
+                "Type": "Task",
+                "Parameters": {
+                  "Bucket.$": "$.fileStoreBucketName",
+                  "Key.$": "States.Format('raw_docs/{}/{}', $.InitialInput.Item.group.S, $.InitialInput.Item.filename.S)"
+                },
+                "Resource": "arn:aws:states:::aws-sdk:s3:deleteObject",
+                "End": true
+              }
+            }
+          },
+          {
+            "StartAt": "Query_big",
+            "States": {
+              "Query_big": {
+                "Type": "Task",
+                "Parameters": {
+                  "TableName.$": "$.bigTable",
+                  "KeyConditionExpression": "id=:partitionkeyval",
+                  "ExpressionAttributeValues": {
+                    ":partitionkeyval": {
+                      "S.$": "States.Format('{}-{}', $.InitialInput.Item.group.S, $.InitialInput.Item.uuid.S)"
+                    }
+                  },
+                  "ProjectionExpression": "id, filename"
+                },
+                "Resource": "arn:aws:states:::aws-sdk:dynamodb:query",
+                "Next": "Map_big",
+                "ResultPath": "$.QueryBigItems"
+              },
+              "Map_big": {
+                "Type": "Map",
+                "ItemProcessor": {
+                  "ProcessorConfig": {
+                    "Mode": "INLINE"
+                  },
+                  "StartAt": "Delete_dynamo_big",
+                  "States": {
+                    "Delete_dynamo_big": {
+                      "Type": "Task",
+                      "Resource": "arn:aws:states:::dynamodb:deleteItem",
+                      "Parameters": {
+                        "TableName.$": "$.TableName",
+                        "Key": {
+                          "id": {
+                            "S.$": "$.id"
+                          },
+                          "filename": {
+                            "S.$": "$.filename"
+                          }
+                        }
+                      },
+                      "End": true
+                    }
+                  }
+                },
+                "ItemsPath": "$.QueryBigItems.Items",
+                "ItemSelector": {
+                  "TableName.$": "$.bigTable",
+                  "id.$": "$$.Map.Item.Value.id.S",
+                  "filename.$": "$$.Map.Item.Value.filename.S"
+                },
+                "End": true
+              }
+            }
+          },
+          {
+            "StartAt": "Query_small",
+            "States": {
+              "Query_small": {
+                "Type": "Task",
+                "Parameters": {
+                  "TableName.$": "$.smallTable",
+                  "KeyConditionExpression": "id=:partitionkeyval",
+                  "ExpressionAttributeValues": {
+                    ":partitionkeyval": {
+                      "S.$": "States.Format('{}-{}', $.InitialInput.Item.group.S, $.InitialInput.Item.uuid.S)"
+                    }
+                  },
+                  "ProjectionExpression": "id, filename"
+                },
+                "Resource": "arn:aws:states:::aws-sdk:dynamodb:query",
+                "Next": "Map_small",
+                "ResultPath": "$.QueryBigItems"
+              },
+              "Map_small": {
+                "Type": "Map",
+                "ItemProcessor": {
+                  "ProcessorConfig": {
+                    "Mode": "INLINE"
+                  },
+                  "StartAt": "Delete_dynamo_small",
+                  "States": {
+                    "Delete_dynamo_small": {
+                      "Type": "Task",
+                      "Resource": "arn:aws:states:::dynamodb:deleteItem",
+                      "Parameters": {
+                        "TableName.$": "$.TableName",
+                        "Key": {
+                          "id": {
+                            "S.$": "$.id"
+                          },
+                          "filename": {
+                            "S.$": "$.filename"
+                          }
+                        }
+                      },
+                      "End": true
+                    }
+                  }
+                },
+                "ItemsPath": "$.QueryBigItems.Items",
+                "ItemSelector": {
+                  "TableName.$": "$.smallTable",
+                  "id.$": "$$.Map.Item.Value.id.S",
+                  "filename.$": "$$.Map.Item.Value.filename.S"
+                },
+                "End": true
+              }
+            }
+          }
+        ],
+        "ResultPath": null
+      },
+      "DynamoDB DeleteItem": {
+        "Type": "Task",
+        "Resource": "arn:aws:states:::dynamodb:deleteItem",
+        "Parameters": {
+          "TableName.$": "$.documentTable",
+          "Key": {
+            "group": {
+              "S.$": "$.InitialInput.Item.group.S"
+            },
+            "filename": {
+              "S.$": "$.InitialInput.Item.filename.S"
+            }
+          }
+        },
+        "End": true
+      }
+    }
+  }

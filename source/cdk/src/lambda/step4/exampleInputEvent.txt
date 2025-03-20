@@ -1,0 +1,7 @@
+{
+  "statusCode": "200",
+  "body": "Success",
+  "chunk_Size": "[1000, 2000]",
+  "amount_chunks": "[75, 33]",
+  "Output": "s3://jmgm-rag-datathon/rag/b273d185-b356-41a4-b4f2-5db83b30510e_tarjeta-visa-coconut_raw/"
+}

@@ -1,0 +1,4 @@
+{
+  "Status": 200,
+  "Output": "s3://jmgm-rag-datathon/raw_text/b273d185-b356-41a4-b4f2-5db83b30510e_tarjeta-visa-coconut_raw.txt"
+}

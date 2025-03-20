@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Authentication</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/js/all.min.js" integrity="sha512-b+nQTCdtTBIRIbraqNEwsjB6UvL3UEMkXnhzd8awtCYh0Kcsjl9uEgwVFVbhoj3uu1DO1ZMacNvLoyJJiNfcvg==" crossorigin="anonymous"></script>
+    <script src="js/utils.js"></script>
+    <link rel="stylesheet" href="style/styles.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <h1>Document Vector Database</h1>
+        </header>
+
+        <div class="auth-container fade-in">
+            <div class="auth-logo">
+                <i class="fas fa-database" style="font-size: 3rem; color: var(--primary-color);"></i>
+            </div>
+            
+            <h2 class="auth-title">Authentication</h2>
+            
+            <div id="auth-status" class="auth-message">
+                <i class="fas fa-spinner fa-spin"></i> Checking authentication...
+            </div>
+            
+            <div id="login-section" class="slide-in" style="display: none;">
+                <p class="auth-message">You need to log in to access the application.</p>
+                <button id="login-btn" class="btn auth-btn">
+                    <i class="fas fa-sign-in-alt"></i> Login
+                </button>
+            </div>
+            
+            <div id="success-section" class="slide-in" style="display: none;">
+                <p class="auth-message">
+                    <i class="fas fa-check-circle" style="color: var(--success-color);"></i> Authentication successful!
+                </p>
+                <button id="continue-btn" class="btn auth-btn">
+                    <i class="fas fa-arrow-right"></i> Continue to Application
+                </button>
+            </div>
+        </div>
+
+        <footer>
+            <p>&copy; 2025 Document Vector Database. All rights reserved.</p>
+        </footer>
+    </div>
+
+    <!-- HTML Templates Section -->
+    <template id="auth-status-template">
+        <i class="auth-status-icon"></i>
+        <span class="auth-status-text"></span>
+    </template>
+
+    <!-- Hidden elements for configuration values -->
+    <div id="apiendpointupload" style="display: none;"></div>
+    <div id="apiendpointconfig" style="display: none;"></div>
+    <div id="apiendpointchat" style="display: none;"></div>
+    <div id="apiendpointdocuments" style="display: none;"></div>
+    <div id="signinurl" style="display: none;"></div>
+    <div id="cognito-client-id" style="display: none;"></div>
+    <div id="cognito-region" style="display: none;"></div>
+
+    <script>
+        $(document).ready(function() {
+            // Load configuration
+            $.getJSON("./config.json", function(data) {
+                $("#apiendpointupload").text(data.apiendpointupload);
+                $("#apiendpointconfig").text(data.apiendpointconfig);
+                $("#apiendpointchat").text(data.apiendpointchat);
+                $("#apiendpointdocuments").text(data.apiendpointdocuments);
+                $("#signinurl").text(data.signinurl);
+                $('#cognito-client-id').text(data.cognitoclientid);
+                $('#cognito-region').text(data.cognitoregion);
+                
+                // Check authentication
+                checkAuthentication();
+            });
+            
+            // Function to check authentication
+            function checkAuthentication() {
+                try {
+                    const token = getCognitoToken();
+                    
+                    if (token) {
+                        // Authentication successful
+                        updateAuthStatus('success', 'Authentication verified');
+                        $('#success-section').fadeIn(300);
+                        $('#login-section').hide();
+                    } else {
+                        // No valid token found
+                        updateAuthStatus('info', 'Authentication required');
+                        $('#login-section').fadeIn(300);
+                        $('#success-section').hide();
+                    }
+                } catch (error) {
+                    console.error('Authentication error:', error);
+                    updateAuthStatus('error', 'Authentication error');
+                    $('#login-section').fadeIn(300);
+                    $('#success-section').hide();
+                }
+            }
+            
+            // Function to safely update auth status
+            function updateAuthStatus(type, message) {
+                const statusElement = document.getElementById('auth-status');
+                
+                // Clear current content
+                while (statusElement.firstChild) {
+                    statusElement.removeChild(statusElement.firstChild);
+                }
+                
+                // Create icon element
+                const iconElement = document.createElement('i');
+                
+                switch(type) {
+                    case 'success':
+                        iconElement.className = 'fas fa-check-circle';
+                        iconElement.style.color = 'var(--success-color)';
+                        break;
+                    case 'error':
+                        iconElement.className = 'fas fa-exclamation-circle';
+                        iconElement.style.color = 'var(--error-color)';
+                        break;
+                    case 'info':
+                        iconElement.className = 'fas fa-info-circle';
+                        break;
+                    default:
+                        iconElement.className = 'fas fa-spinner fa-spin';
+                }
+                
+                // Create text node
+                const textNode = document.createTextNode(' ' + message);
+                
+                // Append elements
+                statusElement.appendChild(iconElement);
+                statusElement.appendChild(textNode);
+            }
+            
+            // Login button click
+            $('#login-btn').click(function() {
+                updateAuthStatus('loading', 'Redirecting to login...');
+                setTimeout(function() {
+                    redirectToLogin();
+                }, 500);
+            });
+            
+            // Continue button click
+            $('#continue-btn').click(function() {
+                updateAuthStatus('loading', 'Loading application...');
+                setTimeout(function() {
+                    window.location.href = 'index.html';
+                }, 500);
+            });
+        });
+    </script>
+</body>
+</html>
