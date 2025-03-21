@@ -24,7 +24,9 @@ from aws_cdk import (
     aws_stepfunctions_tasks as tasks,
     aws_sns as _sns,
     aws_sns_subscriptions as sns_subscriptions,
-    aws_kms as kms
+    aws_kms as kms,
+    aws_logs as logs,
+    aws_wafv2 as wafv2
 )
 import aws_cdk as cdk
 import json
@@ -69,14 +71,105 @@ class ChatbotStack(Stack):
         self.create_api_lambdas()
         self.create_user_pool()
         self.build_post_confirmation_trigger()
-        self.create_api_gw()
+        self.create_waf()
         self.create_web_app()
+        self.create_api_gw()
+        self.create_s3_deployment()
         self.outputs()
 
     def outputs(self):
         admin_portal = "https://"+self.cloudfront_website.distribution_domain_name
         cdk.CfnOutput(self, "AdminPortal", value=admin_portal, description="Admin Portal")
 
+    def create_waf(self):
+        # Create a WAFv2 web ACL
+        self.waf_acl = wafv2.CfnWebACL(self, 
+            "AIBotCFACL",
+                scope="CLOUDFRONT",
+            name="AIBotCFACL",
+            description="AIBotCFACL",
+            default_action=wafv2.CfnWebACL.DefaultActionProperty(allow={}),
+            visibility_config=wafv2.CfnWebACL.VisibilityConfigProperty(
+                cloud_watch_metrics_enabled=True,
+                metric_name="AIBotCFACL",
+                sampled_requests_enabled=False
+            ),
+            rules=[
+                # AWS-AWSManagedRulesCommonRuleSet
+                {
+                    "name": "AWS-AWSManagedRulesCommonRuleSet",
+                    "priority": 0,
+                    "statement": {
+                        "managedRuleGroupStatement": {
+                            "vendorName": "AWS",
+                            "name": "AWSManagedRulesCommonRuleSet"
+                        }
+                    },
+                    "overrideAction": {
+                        "none": {}
+                    },
+                    "visibilityConfig": {
+                        "cloudWatchMetricsEnabled": True,
+                        "metricName": "AWS-AWSManagedRulesCommonRuleSet",
+                        "sampledRequestsEnabled": False
+                    }
+                },
+                # AWS-AWSManagedRulesAmazonIpReputationList
+                {
+                    "name": "AWS-AWSManagedRulesAmazonIpReputationList",
+                    "priority": 1,
+                    "statement": {
+                        "managedRuleGroupStatement": {
+                            "vendorName": "AWS",
+                            "name": "AWSManagedRulesAmazonIpReputationList"
+                        }
+                    },
+                    "overrideAction": {
+                        "none": {}
+                    },
+                    "visibilityConfig": {
+                        "cloudWatchMetricsEnabled": True,
+                        "metricName": "AWS-AWSManagedRulesAmazonIpReputationList",
+                        "sampledRequestsEnabled": False
+                    }
+                },
+                # AWS-AWSManagedRulesKnownBadInputsRuleSet
+                {
+                    "name": "AWS-AWSManagedRulesKnownBadInputsRuleSet",
+                    "priority": 2,
+                    "statement": {
+                        "managedRuleGroupStatement": {
+                            "vendorName": "AWS",
+                            "name": "AWSManagedRulesKnownBadInputsRuleSet"
+                        }
+                    },
+                    "overrideAction": {
+                        "none": {}
+                    },
+                    "visibilityConfig": {
+                        "cloudWatchMetricsEnabled": True,
+                        "metricName": "AWS-AWSManagedRulesKnownBadInputsRuleSet",
+                        "sampledRequestsEnabled": False
+                    }
+                }
+            ])
+
+    def create_s3_deployment(self):
+        s3deploy.BucketDeployment(self, "DeployWebsite",
+            sources=[
+                s3deploy.Source.asset("./src/web/"),
+                s3deploy.Source.json_data("config.json", {
+                    "apiendpointupload": self.api_gateway.url + self.api_backend_resource_presing.path[1:],
+                    "apiendpointconfig": self.api_gateway.url + self.api_backend_resource_config.path[1:],
+                    "apiendpointchat": self.api_gateway.url + self.api_backend_resource_chat.path[1:],
+                    "apiendpointdocuments": self.api_gateway.url + self.api_backend_resource_documents.path[1:],
+                    "signinurl": self.sign_in_url,
+                    "cognitoclientid" : self.client.user_pool_client_id,
+                    "cognitoregion" : self.region
+                })
+            ],
+            destination_bucket=self.s3_website_bucket
+        )
 
     def build_post_confirmation_trigger(self):
         self.post_confirmation_trigger = python.PythonFunction(self, "PostConfirmationTrigger",
@@ -283,24 +376,93 @@ class ChatbotStack(Stack):
             )
         )
         self.s3_file_bucket.grant_put(self.api_back_signed_url)
-        # maybe read is not necesary
-        #self.s3_file_bucket.grant_read(self.api_back_signed_url)
 
     def create_api_gw(self):
-        # cloudfront_domain = self.cloudfront_website.domain_name
-        # cloudfront_domain = cloudfront_domain.replace("https://", "") 
+        cloudfront_domain =  "https://"+self.cloudfront_website.distribution_domain_name
         self.api_gateway = apigateway.RestApi(
             self, "ApiGWBackend",
             rest_api_name="AIbotApiGateway",
             description="This is the AIbot API Gateway",
+            cloud_watch_role=True,
+            deploy_options=apigateway.StageOptions(
+                logging_level=apigateway.MethodLoggingLevel.ERROR,
+                access_log_destination=apigateway.LogGroupLogDestination(
+                    logs.LogGroup(self, "ApiGatewayAccessLogs", retention=logs.RetentionDays.ONE_WEEK)
+                )
+            ),
             default_cors_preflight_options=apigateway.CorsOptions(
                 allow_methods=["*"],
                 # TODO allow the cloufront distribution
-                # allow_origins=[cloudfront_domain],
-                allow_origins=["*"],
+                allow_origins=[cloudfront_domain],
+                # allow_origins=["*"],
                 allow_headers=["*"]),
             # deploy=False
                 )
+        # body models 
+        # configure promt model
+        model_prompt = apigateway.Model(
+            self, "AIBotPromptModel",
+            rest_api=self.api_gateway,
+            content_type="application/json",
+            description="AIBot Prompt model",
+            model_name="AIBotPromptModel",
+            schema=apigateway.JsonSchema(
+                schema=apigateway.JsonSchemaVersion.DRAFT4,
+                type=apigateway.JsonSchemaType.OBJECT,
+                required=["system"],
+                properties={
+                    "system": apigateway.JsonSchema(
+                        type=apigateway.JsonSchemaType.STRING
+                    ),
+                    "context": apigateway.JsonSchema(
+                        type=apigateway.JsonSchemaType.STRING
+                    )
+                }
+            )
+        )
+        # chat model
+        model_chat = apigateway.Model(
+            self, "AIBotChatModel",
+            rest_api=self.api_gateway,
+            content_type="application/json",
+            description="AIBot Chat model",
+            model_name="AIBotChatModel",
+            schema=apigateway.JsonSchema(
+                schema=apigateway.JsonSchemaVersion.DRAFT4,
+                type=apigateway.JsonSchemaType.OBJECT,
+                required=["sessionId", "inputTranscript"],
+                properties={
+                    "sessionId": apigateway.JsonSchema(
+                        type=apigateway.JsonSchemaType.STRING
+                    ),
+                    "inputTranscript": apigateway.JsonSchema(
+                        type=apigateway.JsonSchemaType.STRING
+                    )
+                }
+            )
+        )
+        # document model
+        model_document = apigateway.Model(
+            self, "AIBotDocumentModel",
+            rest_api=self.api_gateway,
+            content_type="application/json",
+            description="AIBot Document model",
+            model_name="AIBotDocumentModel",
+            schema=apigateway.JsonSchema(
+                schema=apigateway.JsonSchemaVersion.DRAFT4,
+                type=apigateway.JsonSchemaType.OBJECT,
+                required=["group", "filename"],
+                properties={
+                    "group": apigateway.JsonSchema(
+                        type=apigateway.JsonSchemaType.STRING
+                    ),
+                    "filename": apigateway.JsonSchema(
+                        type=apigateway.JsonSchemaType.STRING
+                    )
+                }
+            )
+        )
+
         # api_back_signed
         api_back_signed_url_integration = apigateway.LambdaIntegration(self.api_back_signed_url,
                 request_templates={"application/json": '{ "statusCode": "200" }'})
@@ -311,7 +473,14 @@ class ChatbotStack(Stack):
         method_api_backend_presing_get = self.api_backend_resource_presing.add_method(
             "GET", api_back_signed_url_integration,
             authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=self.autorizer
+            authorizer=self.autorizer,
+            request_parameters={
+                "method.request.querystring.file_name": True
+            },
+            request_validator_options={
+                "validate_request_parameters": True,
+                "request_validator_name": "validate-presing_get"
+            }
         )
 
         # api_back_configure
@@ -322,12 +491,27 @@ class ChatbotStack(Stack):
         method_api_backend_configure_post = self.api_backend_resource_config.add_method(
             "POST", api_back_configure_integration,
             authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=self.autorizer
+            authorizer=self.autorizer,
+            request_validator = apigateway.RequestValidator(
+                self, "ConfigurePostValidator",
+                rest_api=self.api_gateway,
+                request_validator_name="validate-configure_post",
+                validate_request_body=True),
+            request_models={
+                "application/json": model_prompt
+            }
         )
         method_api_backend_configure_get = self.api_backend_resource_config.add_method(
             "GET", api_back_configure_integration,
             authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=self.autorizer
+            authorizer=self.autorizer,
+            request_parameters={
+                "method.request.querystring.prompt": True
+            },
+            request_validator_options={
+                "validate_request_parameters": True,
+                "request_validator_name": "validate-configure_get"
+            }
         )
 
         # api_back_chat
@@ -337,7 +521,15 @@ class ChatbotStack(Stack):
         method_api_backend_chat_post = self.api_backend_resource_chat.add_method(
             "POST", api_back_chat_integration,
             authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=self.autorizer
+            authorizer=self.autorizer,
+            request_validator = apigateway.RequestValidator(
+                self, "ChatPostValidator",
+                rest_api=self.api_gateway,
+                request_validator_name="validate-chat_post",
+                validate_request_body=True),
+            request_models={
+                "application/json": model_chat
+            }
         )
         # api_back_documents
         api_back_documents_integration = apigateway.LambdaIntegration(self.api_back_documents,
@@ -347,19 +539,26 @@ class ChatbotStack(Stack):
         method_api_backend_documents_get = self.api_backend_resource_documents.add_method(
             "GET", api_back_documents_integration,
             authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=self.autorizer
+            authorizer=self.autorizer,
+            request_parameters={},
+            request_validator_options={
+                "validate_request_parameters": True,
+                "request_validator_name": "validate-documents_get"
+            }
         )
 
         method_api_backend_documents_delete = self.api_backend_resource_documents.add_method(
             "DELETE", api_back_documents_integration,
             authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=self.autorizer
-        )
-        
-        method_api_backend_documents_PUT = self.api_backend_resource_documents.add_method(
-            "PUT", api_back_documents_integration,
-            authorization_type=apigateway.AuthorizationType.COGNITO,
-            authorizer=self.autorizer
+            authorizer=self.autorizer,
+            request_validator = apigateway.RequestValidator(
+                self, "DocumentsDeleteValidator",
+                rest_api=self.api_gateway,
+                request_validator_name="validate-documents_delete",
+                validate_request_body=True),
+            request_models={
+                "application/json": model_document
+            }
         )
         # deployment = apigateway.Deployment(self, "Deployment",
         #     api=self.api_gateway,
@@ -371,7 +570,14 @@ class ChatbotStack(Stack):
 
     def create_web_app(self):
          # an s3 bucket for the web page that uses the files in the web folder
-        self.s3_website_bucket = s3.Bucket(self, "AIbot-WebsiteBucket", enforce_ssl=True)  
+        self.s3_website_bucket = s3.Bucket(
+            self, 
+            "AIbot-WebsiteBucket", 
+            enforce_ssl=True,
+            block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
+            removal_policy=RemovalPolicy.DESTROY,
+            auto_delete_objects=True
+            )
         # create log bucket for CF
         self.log_cf_bucket = s3.Bucket(
             self,
@@ -383,12 +589,11 @@ class ChatbotStack(Stack):
             object_ownership=s3.ObjectOwnership.OBJECT_WRITER,  # Required for CloudFront logging
             access_control=s3.BucketAccessControl.LOG_DELIVERY_WRITE 
         )
-        # create an origin access identity
-        oin = _cf.OriginAccessIdentity(
-            self, "AIbotOriginAccessIdentity",
-            comment="AIbotOriginAccessIdentity")
-        # give permisions to the origin_access_identity to access the s3_website_bucket
-        self.s3_website_bucket.grant_read(oin)
+        # Create Origin Access Control
+        s3_origin = origins.S3BucketOrigin.with_origin_access_control(self.s3_website_bucket,
+            origin_access_levels=[_cf.AccessLevel.READ, _cf.AccessLevel.LIST]
+        )
+
         # a cloudfront distribution for the s3_website_bucket
         self.cloudfront_website = _cf.Distribution(
             self,
@@ -397,11 +602,11 @@ class ChatbotStack(Stack):
             enable_logging=True,
             log_bucket=self.log_cf_bucket,
             log_file_prefix="cf-logs/",
+            web_acl_id= self.waf_acl.attr_arn,
             default_behavior=_cf.BehaviorOptions(
                 allowed_methods=_cf.AllowedMethods.ALLOW_ALL,
-                origin=origins.S3Origin(
-                    self.s3_website_bucket,
-                    origin_access_identity=oin)))
+                viewer_protocol_policy=_cf.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+                origin=s3_origin))
         
         self.redirect_uri = "https://"+self.cloudfront_website.distribution_domain_name + "/fallback.html"
         # add permisions to the cloudfront distribution to CORS to the file bucket
@@ -412,7 +617,7 @@ class ChatbotStack(Stack):
             allowed_methods=[s3.HttpMethods.PUT],
             allowed_headers=['*']
             )
-        client = self.user_pool.add_client("AIBot-client",
+        self.client = self.user_pool.add_client("AIBot-client",
             o_auth=_cognito.OAuthSettings(
                 flows=_cognito.OAuthFlows(
                     implicit_code_grant=True
@@ -425,23 +630,8 @@ class ChatbotStack(Stack):
                 user_srp=True
             )
         )
-        self.sign_in_url = self.domain.sign_in_url(client,
+        self.sign_in_url = self.domain.sign_in_url(self.client,
             redirect_uri=self.redirect_uri
-        )
-        s3deploy.BucketDeployment(self, "DeployWebsite",
-            sources=[
-                s3deploy.Source.asset("./src/web/"),
-                s3deploy.Source.json_data("config.json", {
-                    "apiendpointupload": self.api_gateway.url + self.api_backend_resource_presing.path[1:],
-                    "apiendpointconfig": self.api_gateway.url + self.api_backend_resource_config.path[1:],
-                    "apiendpointchat": self.api_gateway.url + self.api_backend_resource_chat.path[1:],
-                    "apiendpointdocuments": self.api_gateway.url + self.api_backend_resource_documents.path[1:],
-                    "signinurl": self.sign_in_url,
-                    "cognitoclientid" : client.user_pool_client_id,
-                    "cognitoregion" : self.region
-                })
-            ],
-            destination_bucket=self.s3_website_bucket
         )
     
     def build_del_document_state_machine(self):
@@ -564,7 +754,18 @@ class ChatbotStack(Stack):
             event_bridge_enabled=True,
             encryption=s3.BucketEncryption.KMS_MANAGED,
             removal_policy=RemovalPolicy.DESTROY,
-            auto_delete_objects=True
+            auto_delete_objects=True,
+            lifecycle_rules=[
+                s3.LifecycleRule(
+                    transitions=[
+                        s3.Transition(
+                            storage_class=s3.StorageClass.INFREQUENT_ACCESS,
+                            transition_after=Duration.days(90)
+                        )
+                    ],
+                    # expiration=Duration.days(365)
+                )
+            ]
         )
 
     def create_dynamo_tables(self):
@@ -651,8 +852,7 @@ class ChatbotStack(Stack):
                 "BUCKET_NAME": self.s3_file_bucket.bucket_name,
                 "DOCUMENT_TABLE": self.table_documents.table_name,
                 "SNS_TOPIC": self.sns_topic.topic_arn,
-                "TEXTRACT_ROLE": self.sns_role.role_arn,
-                "DEFAULT_TMP": "/tmp"
+                "TEXTRACT_ROLE": self.sns_role.role_arn
                 },
             timeout=Duration.seconds(900),
             memory_size=1024,

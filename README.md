@@ -26,7 +26,7 @@ Creating RAG architectures tends to be cost prohibitive to small and medium busi
 
 ### Cost
 
-_You are responsible for the cost of the AWS services used while running this Guidance. As of Feb 2025, the cost for running this Guidance with the default settings in the US East (N. Virginia) is approximately $21.06 per month for processing and querying (200 records PDF docs, 200KB average file size (10 pags), 6 queries per hour)._
+_You are responsible for the cost of the AWS services used while running this Guidance. As of Feb 2025, the cost for running this Guidance with the default settings in the US East (N. Virginia) is approximately $29.16 per month for processing and querying (200 records PDF docs, 200KB average file size (10 pags), 6 queries per hour)._
 
 _We recommend creating a [Budget](https://docs.aws.amazon.com/cost-management/latest/userguide/budgets-managing-costs.html) through [AWS Cost Explorer](https://aws.amazon.com/aws-cost-management/aws-cost-explorer/) to help manage costs. Prices are subject to change. For full details, refer to the pricing webpage for each AWS service used in this Guidance._
 
@@ -49,7 +49,8 @@ The following table provides a sample cost breakdown for deploying this Guidance
 | Textract          | $1.50     | $3.00     | $4.50     | $6.00     |
 | Bedrock Embedding | $2.00     | $4.00     | $6.00     | $8.00     |
 | Bedrock Claude    | $7.14     | $7.14     | $7.14     | $11.90    |
-| Total             | $15.63    | $21.06    | $32.46    | $59.66    |
+| AWS WAF           | $8.1      | $8.1      | $8.1      | $8.1      |
+| Total             | $23.73    | $29.16    | $40.56    | $67.76    |
 
 ## Prerequisites
 

@@ -67,7 +67,7 @@ import time
 import os
 import uuid
 from pathlib import Path
-import pymupdf
+import pypdf
 
 
 # Initialize S3 and Textract clients
@@ -78,8 +78,6 @@ dynamodb = boto3.resource('dynamodb')
 s3_resource = boto3.resource('s3')
 sns_topic = os.environ.get("SNS_TOPIC", None)
 sns_role = os.environ.get("TEXTRACT_ROLE", None)
-DEFAULT_TMP = os.environ.get('DEFAULT_TMP')
-
 def copy_to_s3(bucket_source, bucket_target, key_source, key_target):
     #Creating S3 Resource From the Session.
     #create a source dictionary that specifies bucket name and key name of the object to be copied
@@ -109,7 +107,7 @@ def create_document_dynamodb(key, bucket):
 
 def split_pdf(pdf_path: str, output_dir: str = "split_pages") -> list[str]:
     """
-    Splits a PDF into single pages and saves them in the output directory.
+    Splits a PDF into single pages and saves them in the output directory using pypdf.
     
     Args:
         pdf_path (str): Path to the PDF file to split
@@ -134,16 +132,20 @@ def split_pdf(pdf_path: str, output_dir: str = "split_pages") -> list[str]:
         created_files = []
         
         # Open and process PDF
-        with pymupdf.open(pdf_path) as pdf_document:
-            for page_num in range(len(pdf_document)):
-                # Create new PDF with single page
-                with pymupdf.open() as new_pdf:
-                    new_pdf.insert_pdf(pdf_document, from_page=page_num, to_page=page_num)
-                    
-                    # Save the page
-                    output_path = str(output_dir / f"page_{page_num + 1}.pdf")
-                    new_pdf.save(output_path)
-                    created_files.append(output_path)
+        with open(pdf_path, 'rb') as pdf_file:
+            pdf_reader = pypdf.PdfReader(pdf_file)
+            
+            for page_num in range(len(pdf_reader.pages)):
+                # Create new PDF writer for each page
+                pdf_writer = pypdf.PdfWriter()
+                # Add the page
+                pdf_writer.add_page(pdf_reader.pages[page_num])
+                
+                # Save the page
+                output_path = str(output_dir / f"page_{page_num + 1}.pdf")
+                with open(output_path, 'wb') as output_file:
+                    pdf_writer.write(output_file)
+                created_files.append(output_path)
                     
         return created_files
         
@@ -187,8 +189,8 @@ def handler(event, context):
     # download the pdf from s3
     local_file_name = key.split('/')[-1]
     # download has to be in the tmp dir
-    local_file_name = f"{DEFAULT_TMP}/{local_file_name}"
-    output_dir = f"{DEFAULT_TMP}/split_pages"
+    local_file_name = f"/tmp/{local_file_name}"
+    output_dir = "/tmp/split_pages"
     s3.download_file(bucket, key, local_file_name)
     # upload to s3
     original_filename = key.split('/')[-1].split('.')[0]
@@ -203,62 +205,3 @@ def handler(event, context):
         'JobID': response['JobId'],
         'pages_prefix': f"{key_filename_prefix}"
     }
-
-    # TODO Return and do not wait we will subscribe to the textract SNS
-    # Get the job ID
-    # job_id = response['JobId']
-    
-    # # print(f"Started Textract job {job_id} for {key}")
-    
-    # # Wait for the job to complete
-    # while True:
-    #     response = textract.get_document_text_detection(JobId=job_id)
-    #     status = response['JobStatus']
-    #     if status in ['SUCCEEDED', 'FAILED']:
-    #         break
-    #     time.sleep(5)
-    
-    # if status == 'SUCCEEDED':
-    #     # Collect all pages
-    #     pages = []
-    #     pages.append(response)
-    #     next_token = response.get('NextToken')
-        
-    #     while next_token:
-    #         response = textract.get_document_text_detection(JobId=job_id, NextToken=next_token)
-    #         pages.append(response)
-    #         next_token = response.get('NextToken')
-        
-    #     # Combine all pages into a single JSON
-    #     full_response = {
-    #         'JobId': job_id,
-    #         'Status': status,
-    #         'Pages': pages
-    #     }
-        
-    #     # Create a filename for the JSON output, including the aws_request_id
-    #     original_filename = key.split('/')[-1].split('.')[0]
-    #     group = key.split('/')[-2]
-    #     json_filename = f"raw_json/{group}/{_uuid}_{original_filename}_textract.json"
-        
-    #     # Upload the JSON to S3
-    #     s3.put_object(
-    #         Bucket=bucket,
-    #         Key=json_filename,
-    #         Body=json.dumps(full_response)
-    #     )
-        
-    #     # print(f"Textract job completed. Output saved to {json_filename}")
-        
-    #     return {
-    #         'statusCode': 200,
-    #         'JobID': job_id,
-    #         'Output': f"s3://{bucket}/{json_filename}"
-    #     }
-    # else:
-    #     # print(f"Textract job failed for {key}")
-    #     return {
-    #         'statusCode': 500,
-    #         'JobID': job_id,
-    #         'Output': None
-    #     }
