@@ -379,12 +379,11 @@ class ChatbotStack(Stack):
 
     def create_api_gw(self):
         cloudfront_domain =  "https://"+self.cloudfront_website.distribution_domain_name
-        # cloudfront_domain = cloudfront_domain.replace("https://", "") 
         self.api_gateway = apigateway.RestApi(
             self, "ApiGWBackend",
             rest_api_name="AIbotApiGateway",
             description="This is the AIbot API Gateway",
-            # enable logging
+            cloud_watch_role=True,
             deploy_options=apigateway.StageOptions(
                 logging_level=apigateway.MethodLoggingLevel.ERROR,
                 access_log_destination=apigateway.LogGroupLogDestination(
