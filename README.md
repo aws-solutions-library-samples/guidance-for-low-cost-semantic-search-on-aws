@@ -22,7 +22,7 @@ Creating RAG architectures tends to be cost prohibitive to small and medium busi
 
 ### Architecture Diagram
 
-![architecture](./assets/images/architecture.png)
+![architecture](./assets/images/architecture.jpg)
 
 ### Cost
 
