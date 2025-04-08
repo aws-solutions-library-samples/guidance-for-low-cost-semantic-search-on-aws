@@ -22,7 +22,7 @@ Creating RAG architectures tends to be cost prohibitive to small and medium busi
 
 ### Architecture Diagram
 
-![architecture](./assets/images/architecture.png)
+![architecture](./assets/images/architecture.jpg)
 
 ### Cost
 
@@ -43,14 +43,17 @@ The following table provides a sample cost breakdown for deploying this Guidance
 
 | Service           | Scenario1 | Scenario2 | Scenario3 | Scenario4 |
 | ----------------- | --------- | --------- | --------- | --------- |
-| Storage           | $0.03     | $0.03     | $0.01     | $0.25     |
-| Compute           | $0.00     | $0.00     | $0.00     | $0.63     |
-| DynamoDB r/w      | $4.96     | $9.89     | $14.81    | $32.88    |
-| Textract          | $1.50     | $3.00     | $4.50     | $6.00     |
-| Bedrock Embedding | $2.00     | $4.00     | $6.00     | $8.00     |
-| Bedrock Claude    | $7.14     | $7.14     | $7.14     | $11.90    |
+| Storage(S3)           | $0.03     | $0.03     | $0.01     | $0.25     |
+| Compute(Lambda & ApiGw)           | $0.00     | $0.00     | $0.00     | $0.63     |
+| Amazon DynamoDB r/w      | $4.96     | $9.89     | $14.81    | $32.88    |
+| Amazon Textract*          | $1.50     | $3.00     | $4.50     | $6.00     |
+| Amazon Bedrock Embedding | $2.00     | $4.00     | $6.00     | $8.00     |
+| Amazon Bedrock Claude    | $7.14     | $7.14     | $7.14     | $11.90    |
 | AWS WAF           | $8.1      | $8.1      | $8.1      | $8.1      |
-| Total             | $23.73    | $29.16    | $40.56    | $67.76    |
+| AWS StepFunctions*  | $0.05      | $0.1      | $0.14      | $0.19      |
+| Total             | $23.78    | $29.26    | $40.7    | $67.95    |
+
+_* AWS StepFunctions and Amazon Textract are only billed during document ingestion process, this means it will not be a monthly recurring cost_
 
 ## Prerequisites
 
@@ -198,9 +201,18 @@ Also You can integrate this Guidance using the pre-provided lex bot deployment t
 ## FAQ, known issues, additional considerations, and limitations
 
 
-**Known issues (optional)**
+**FAQ**
 
-<If there are common known issues, or errors that can occur during the Guidance deployment, describe the issue and resolution steps here>
+#### Why does the first query fails?
+
+Since the AIAgent runs on a AWS Lambda container, the first execution always takes more than 30 seconds from the cold start. That causes an Amazon API Gateway timeout. If the user tries again, everything should work correctly.
+
+#### Is my file already processed?
+This solution uses two AWS Step Functions to process the uploaded document, To verify the status of a document you can login to the AWS console, and lookup for the state machines that have the following naming format `AIbotSMLLMParser` and `AIbotSM`. In the execution tab of each State machine you will find the status of each document.
+
+#### Is my file already deleted?
+This solution uses a AWS Step Functions to delete the uploaded document, To verify the status of a document you can login to the AWS console, and lookup for the state machine that have the following naming format `AIbotSMDeletion`. In the execution tab of the State machine you will find the status of each document.
+
 
 
 ## Notices
