@@ -10,6 +10,6 @@ app = cdk.App()
 ChatbotStack(app, "ChatbotStack",env=cdk.Environment(
     account = os.environ["CDK_DEFAULT_ACCOUNT"],
     region = os.environ["CDK_DEFAULT_REGION"]),
-    description = "Guidance for Low Cost Semantic search on AWS (5179)")
+    description = "Guidance for Low Cost Semantic search on AWS (5179), (SO9030)")
 
 app.synth()
