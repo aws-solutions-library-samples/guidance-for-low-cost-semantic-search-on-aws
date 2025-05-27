@@ -145,7 +145,7 @@ This Guidance is built for us-east-1 region
 * Deploy the stack
 `cdk deploy`
 
-* _If you want to enable self user sing up (not recomended) use the following deploy command instead:_
+* _If you want to enable self user sign up (not recomended) use the following deploy command instead:_
 `cdk deploy --c selfSignup=True`
 
 ## Deployment Validation
@@ -154,7 +154,7 @@ This Guidance is built for us-east-1 region
 * If the deployment was successful you will see an output in the cdk called  `ChatbotStack.AdminPortal`
 ## Running the Guidance
 ### UserCreation
-You will need to create a User in Amazon Cognito. If you opted for SelfSingUp enabled you could navigate to the cloudfront distribution and you will get redirected to the Amazon Cognito HostedUI for user creation.
+You will need to create a User in Amazon Cognito. If you opted for SelfSignUp enabled you could navigate to the cloudfront distribution and you will get redirected to the Amazon Cognito HostedUI for user creation.
 
 If you deployed **WITHOUT**  `--c selfSignup=True` you need to create a user directly in the [Amazon Cognito API/Console](https://docs.aws.amazon.com/cognito/latest/developerguide/how-to-create-user-accounts.html) and add them to the default [Group that is precreated](https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pools-user-groups.html).
 
