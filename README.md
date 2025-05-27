@@ -222,8 +222,10 @@ This solution uses a AWS Step Functions to delete the uploaded document, To veri
 
 ## Authors
 
-Gasamoma
-JmGomez
-ElRuncho
-Hercamil
-Lzanda
+| Name | Contact | LinkedIn |
+|------|---------|----------|
+| Gabriel Montero | gasamoma@ | [LinkedIn Profile](https://www.linkedin.com/in/gasamoma) |
+| Jose Miguel Gomez | jmgomez@ | [LinkedIn Profile](https://www.linkedin.com/in/miguelgomezaws/) |
+| Rafael Hernando Franco | raffran@ | [LinkedIn Profile](https://www.linkedin.com/in/rafael-hernando-franco/) |
+| Camilo Cortes | hercamil@ | [LinkedIn Profile](https://www.linkedin.com/in/cortescamilo) |
+| Daniela Rojas | lzanda@ | [LinkedIn Profile](https://www.linkedin.com/in/daniela-del-pilar-rojas-lozano-74b322174/) |
