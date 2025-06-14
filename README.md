@@ -110,16 +110,6 @@ Click **Request model access** to activate the models in your account
 6. Verify that the model access status is **Access granted** for the selected Anthropic Claude model and Titan embeddings.
 ![](./images/bedrock-configure-5.png)
 
-### AWS cdk bootstrap
-
-
-This Guidance uses aws-cdk. If you are using aws-cdk for first time, please perform the below bootstrapping”
-
-* Navigate into the CDK directory.
-`cd source/cdk`
-* Bootstrap your environment.
-`cdk bootstrap`
-
 ### Service limits
 
 Keep in mind that all bedrock models have some service limmits that will affect if a user gets for the invoke model operation, for a up-to-date refer to [Bedrock Limits](https://docs.aws.amazon.com/general/latest/gr/bedrock.html#limits_bedrock).
@@ -139,6 +129,10 @@ This Guidance is built for us-east-1 region
 `cd source/cdk`
 
 `pip install -r requirements.txt`
+
+* Bootstrap your AWS environment _(only needed once per AWS account and region)_.  
+`cdk bootstrap`  
+> This command sets up the necessary resources (like an S3 bucket and IAM roles) that the AWS CDK uses to deploy your stack.
 
 * Review the Cloudformation Template.
 `cdk synth`
