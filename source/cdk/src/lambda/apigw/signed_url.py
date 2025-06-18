@@ -10,8 +10,12 @@ s3 = boto3.client('s3', config=config)
 
 
 def handler(event, context):
-    # get the user groups from cognito in the event
-    groups = event['requestContext']['authorizer']['claims']['cognito:groups'].split(',')
+    #check if the event comes with a cognito group
+    try:
+        # get the user groups from cognito in the event
+        groups = event['requestContext']['authorizer']['claims']['cognito:groups'].split(',')
+    except KeyError:
+        return utils.response(json.dumps({'error': 'Contact Your administrator: CognitoGroupNotFound, ensure that your user is assigned to a cognito group'}), code=400)
     ## TODO let the user decide for what group they want to upload he document if in multiple groups
     ## if not in multiple groups, use the first group
     group = groups[0]
@@ -19,6 +23,8 @@ def handler(event, context):
     #print(event)
     body =  event['queryStringParameters']
     #body = json.loads(body)
+    if 'file_name' not in body:
+        return utils.response(json.dumps({'error': 'No file name found in the request'}), code=400)
     file_name = body['file_name']
     bucket_name = os.environ.get('BUCKET', None)
     upload_prefix = os.environ.get('UPLOAD_PREFIX', "")

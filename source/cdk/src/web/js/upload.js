@@ -196,15 +196,19 @@ $(document).ready(function () {
                 }
             })
             .catch(function(error) {
+                // Extract status code and error message
+                const statusCode = error.status || 'Unknown';
+                const errorResponse = error.responseText || error.statusText || error.message || 'Unknown error';
+                // json parse the error message
+                const errorJson = JSON.parse(errorResponse);
+                const errorDetails = errorJson.error || 'Unknown error';
                 console.error('Error fetching documents:', error);
-                
                 $fileList.empty();
                 const errorMessage = document.createElement('div');
                 errorMessage.className = 'text-center text-error';
                 errorMessage.textContent = 'Failed to load documents';
                 $fileList.append(errorMessage);
-                
-                showErrorNotification('Failed to load documents. Please try again.');
+                showWarningNotification(`Can't Display Documents. Error: ${statusCode} - ${errorDetails}`, 5000);
             });
     }
     
@@ -322,7 +326,12 @@ $(document).ready(function () {
                 })
                 .catch(error => {
                     console.error('Error uploading file:', error);
-                    
+                    // Extract status code and error message
+                    const statusCode = error.status || 'Unknown';
+                    const errorMessage = error.responseText || error.statusText || error.message || 'Unknown error';
+                    // json parse the error message
+                    const errorJson = JSON.parse(errorMessage);
+                    const errorDetails = errorJson.error || 'Unknown error';
                     // Mark file item as error
                     const fileItemElem = document.getElementById(fileId);
                     if (fileItemElem) {
@@ -337,7 +346,7 @@ $(document).ready(function () {
                         // Add error message
                         const errorMsg = document.createElement('div');
                         errorMsg.className = 'error-message';
-                        errorMsg.textContent = 'Upload failed';
+                        errorMsg.textContent = `Upload failed: ${statusCode}`;
                         fileItemElem.appendChild(errorMsg);
                     }
                     
@@ -346,9 +355,9 @@ $(document).ready(function () {
                     // Show notification if all uploads are complete
                     if (successfulUploads + failedUploads === validFilesCount) {
                         if (successfulUploads === 0) {
-                            showErrorNotification('All file uploads failed. Please try again.', 3000);
+                            showErrorNotification(`All uploads failed. Error: ${statusCode} - ${errorDetails}`, 5000);
                         } else {
-                            showWarningNotification(`${successfulUploads} file(s) uploaded, ${failedUploads} failed`, 3000);
+                            showWarningNotification(`${successfulUploads} file(s) uploaded, ${failedUploads} failed. Last error: ${statusCode} - ${errorDetails}`, 5000);
                         }
                     }
                 });
@@ -383,7 +392,14 @@ $(document).ready(function () {
                     }
                 })
                 .catch(function (err) {
-                    console.error('Error fetching document count:', err);
+
+                    // Extract status code and error message
+                    const statusCode = error.status || 'Unknown';
+                    const errorMessage = error.responseText || error.statusText || error.message || 'Unknown error';
+                    // json parse the error message
+                    const errorJson = JSON.parse(errorMessage);
+                    const errorDetails = errorJson.error || 'Unknown error';
+                    showWarningNotification(`Can't List Documents. Error: ${statusCode} - ${errorDetails}`, 5000);
                 });
 
         }, 1000);

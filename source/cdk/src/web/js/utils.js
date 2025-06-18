@@ -152,6 +152,19 @@ function redirectToLogin() {
       console.error('Sign-in URL not found');
   }
 }
+
+function redirectToFallback() {
+  const fallbackurl = "fallback.html"
+  if (fallbackurl) {
+      window.location.href = fallbackurl;
+  } else {
+      console.error('Sign-in URL not found');
+  }
+}
+function logout() {
+  clearTokens();
+  redirectToFallback();
+}
 function getCognitoToken() {
   // First check if there's a token in cookie
   const storedToken = getTokens().idToken;
