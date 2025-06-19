@@ -55,7 +55,12 @@ def list_documents(event):
 
 
 def handler(event, context):
-    print(event)
+    #check if the event comes with a cognito group
+    try:
+        # get the user groups from cognito in the event
+        groups = event['requestContext']['authorizer']['claims']['cognito:groups'].split(',')
+    except KeyError:
+        return utils.response(json.dumps({'error': 'Contact Your administrator: CognitoGroupNotFound, ensure that your user is assigned to a cognito group'}), code=400)
     # if method is get list
     if event['httpMethod'] == 'GET':
         return list_documents(event)

@@ -213,7 +213,8 @@ This solution uses two AWS Step Functions to process the uploaded document, To v
 #### Is my file already deleted?
 This solution uses a AWS Step Functions to delete the uploaded document, To verify the status of a document you can login to the AWS console, and lookup for the state machine that have the following naming format `AIbotSMDeletion`. In the execution tab of the State machine you will find the status of each document.
 
-
+#### CognitoGroupNotFound error?
+This means that the cognito user group is not assigned to the user making the requests, refer to [User Creation](#usercreation). If you already asigned the group to the user and you are still receiving this error, try using the logout Button and authenticating again.
 
 ## Notices
 

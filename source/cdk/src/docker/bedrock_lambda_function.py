@@ -173,7 +173,11 @@ def lambda_handler(event, context):
         table_config = table
         session_id = str(body.get("sessionId", None))
         query = body.get("inputTranscript",None)
-        cognito_groups = event["requestContext"]["authorizer"]["claims"]["cognito:groups"]
+        try:
+            # get the user groups from cognito in the event
+            cognito_groups = event["requestContext"]["authorizer"]["claims"]["cognito:groups"]
+        except KeyError:
+            return utils.response(json.dumps({'error': 'Contact Your administrator: CognitoGroupNotFound, ensure that your user is assigned to a cognito group'}), code=400)
         response = get_response(query, session_id, table_config, cognito_groups)
         return utils.response(json.dumps(response["answer"]))
     else:
