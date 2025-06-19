@@ -115,8 +115,13 @@ Click **Request model access** to activate the models in your account
 
 This Guidance uses aws-cdk. If you are using aws-cdk for first time, please perform the below bootstrapping”
 
-* Navigate into the CDK directory.
-`cd source/cdk`
+* _If using virtual environments activate it depending your OS and install pip libraries to be able to use cdk deploy command_ i.e. `pyenv activate environment`
+
+* Navigate into the CDK directory. `cd source/cdk`
+
+* Install python libraries
+`pip install -r requirements.txt`
+
 * Bootstrap your environment.
 `cdk bootstrap`
 
@@ -133,12 +138,10 @@ This Guidance is built for us-east-1 region
 
 ## Deployment Steps
 
-* _If using virtual environments activate it depending your OS and install pip libraries to be able to use cdk deploy command_ i.e. `pyenv activate environment`
-
-* Navigate into the CDK directory.
-`cd source/cdk`
-
-`pip install -r requirements.txt`
+* Be sure you completed all the steps in [Prerequisites](#prerequisites)
+* Navigate to the cdk directory
+`cd source/cdk` 
+* Activate the environment `pyenv activate environment`
 
 * Review the Cloudformation Template.
 `cdk synth`
