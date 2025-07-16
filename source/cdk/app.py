@@ -4,12 +4,23 @@ import os
 import aws_cdk as cdk
 
 from chatbot.chatbot_stack import ChatbotStack
-
+from chatbot.waf_stack import WafStack
 
 app = cdk.App()
-ChatbotStack(app, "ChatbotStack",env=cdk.Environment(
-    account = os.environ["CDK_DEFAULT_ACCOUNT"],
-    region = os.environ["CDK_DEFAULT_REGION"]),
-    description = "Guidance for Low Cost Semantic search on AWS (5179), (SO9030)")
+
+# Deploy WAF in us-east-1 (required for CloudFront)
+waf_stack = WafStack(app, "WafStack", 
+    env=cdk.Environment(
+        account=os.environ["CDK_DEFAULT_ACCOUNT"],
+        region="us-east-1"),
+    description="WAF for CloudFront in us-east-1")
+
+# Deploy main stack in the default region
+main_stack = ChatbotStack(app, "ChatbotStack",
+    env=cdk.Environment(
+        account=os.environ["CDK_DEFAULT_ACCOUNT"],
+        region=os.environ["CDK_DEFAULT_REGION"]),
+    waf_acl_arn=waf_stack.waf_acl_arn,
+    description="Guidance for Low Cost Semantic search on AWS (5179), (SO9030)")
 
 app.synth()

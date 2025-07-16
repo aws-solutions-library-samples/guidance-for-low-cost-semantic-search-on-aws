@@ -37,7 +37,7 @@ import hashlib
 
 class ChatbotStack(Stack):
 
-    def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
+    def __init__(self, scope: Construct, construct_id: str, waf_acl_arn=None, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
         self.table_conversation = None
@@ -57,6 +57,7 @@ class ChatbotStack(Stack):
         self.state_machine_llm_parser = None
         self.state_machine_textract = None
         self.user_pool = None
+        self.waf_acl_arn = waf_acl_arn
         self.self_signup = self.node.try_get_context("selfSignup")
         self.create_dynamo_tables()
         self.create_s3_bucket()
@@ -82,82 +83,9 @@ class ChatbotStack(Stack):
         cdk.CfnOutput(self, "AdminPortal", value=admin_portal, description="Admin Portal")
 
     def create_waf(self):
-        # Create a WAFv2 web ACL in us-east-1 for CloudFront
-        # Use a cross-region stack for the WAF resources
-        waf_stack = Stack(self, "WafStack", env=cdk.Environment(region="us-east-1"))
-        # Create the WAF ACL in us-east-1
-        waf_acl = wafv2.CfnWebACL(waf_stack,
-            "AIBotCFACL",
-            scope="CLOUDFRONT",
-            name="AIBotCFACL",
-            description="AIBotCFACL",
-            default_action=wafv2.CfnWebACL.DefaultActionProperty(allow={}),
-            visibility_config=wafv2.CfnWebACL.VisibilityConfigProperty(
-                cloud_watch_metrics_enabled=True,
-                metric_name="AIBotCFACL",
-                sampled_requests_enabled=False
-            ),
-            rules=[
-                # AWS-AWSManagedRulesCommonRuleSet
-                {
-                    "name": "AWS-AWSManagedRulesCommonRuleSet",
-                    "priority": 0,
-                    "statement": {
-                        "managedRuleGroupStatement": {
-                            "vendorName": "AWS",
-                            "name": "AWSManagedRulesCommonRuleSet"
-                        }
-                    },
-                    "overrideAction": {
-                        "none": {}
-                    },
-                    "visibilityConfig": {
-                        "cloudWatchMetricsEnabled": True,
-                        "metricName": "AWS-AWSManagedRulesCommonRuleSet",
-                        "sampledRequestsEnabled": False
-                    }
-                },
-                # AWS-AWSManagedRulesAmazonIpReputationList
-                {
-                    "name": "AWS-AWSManagedRulesAmazonIpReputationList",
-                    "priority": 1,
-                    "statement": {
-                        "managedRuleGroupStatement": {
-                            "vendorName": "AWS",
-                            "name": "AWSManagedRulesAmazonIpReputationList"
-                        }
-                    },
-                    "overrideAction": {
-                        "none": {}
-                    },
-                    "visibilityConfig": {
-                        "cloudWatchMetricsEnabled": True,
-                        "metricName": "AWS-AWSManagedRulesAmazonIpReputationList",
-                        "sampledRequestsEnabled": False
-                    }
-                },
-                # AWS-AWSManagedRulesKnownBadInputsRuleSet
-                {
-                    "name": "AWS-AWSManagedRulesKnownBadInputsRuleSet",
-                    "priority": 2,
-                    "statement": {
-                        "managedRuleGroupStatement": {
-                            "vendorName": "AWS",
-                            "name": "AWSManagedRulesKnownBadInputsRuleSet"
-                        }
-                    },
-                    "overrideAction": {
-                        "none": {}
-                    },
-                    "visibilityConfig": {
-                        "cloudWatchMetricsEnabled": True,
-                        "metricName": "AWS-AWSManagedRulesKnownBadInputsRuleSet",
-                        "sampledRequestsEnabled": False
-                    }
-                }
-            ])
-        # Store the WAF ACL ARN for use in CloudFront
-        self.waf_acl_arn = waf_acl.attr_arn
+        # WAF is created in a separate stack in us-east-1
+        # The WAF ARN is passed to this stack as a parameter
+        pass
 
     def create_s3_deployment(self):
         s3deploy.BucketDeployment(self, "DeployWebsite",
@@ -600,18 +528,25 @@ class ChatbotStack(Stack):
         )
 
         # a cloudfront distribution for the s3_website_bucket
+        cf_props = {
+            "default_root_object": "index.html",
+            "enable_logging": True,
+            "log_bucket": self.log_cf_bucket,
+            "log_file_prefix": "cf-logs/",
+            "default_behavior": _cf.BehaviorOptions(
+                allowed_methods=_cf.AllowedMethods.ALLOW_ALL,
+                viewer_protocol_policy=_cf.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+                origin=s3_origin)
+        }
+        
+        # Only add WAF if ARN is provided
+        if self.waf_acl_arn:
+            cf_props["web_acl_id"] = self.waf_acl_arn
+            
         self.cloudfront_website = _cf.Distribution(
             self,
             "AIbotWebsiteDistribution",
-            default_root_object="index.html",
-            enable_logging=True,
-            log_bucket=self.log_cf_bucket,
-            log_file_prefix="cf-logs/",
-            web_acl_id=self.waf_acl_arn,  # Use the ARN from the cross-region WAF
-            default_behavior=_cf.BehaviorOptions(
-                allowed_methods=_cf.AllowedMethods.ALLOW_ALL,
-                viewer_protocol_policy=_cf.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-                origin=s3_origin))
+            **cf_props)
         
         self.redirect_uri = "https://"+self.cloudfront_website.distribution_domain_name + "/fallback.html"
         # add permisions to the cloudfront distribution to CORS to the file bucket

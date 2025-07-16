@@ -145,11 +145,20 @@ This Guidance is built for us-east-1 region
 
 * Review the Cloudformation Template.
 `cdk synth`
-* Deploy the stack
-`cdk deploy`
 
-* _If you want to enable self user sign up (not recomended) use the following deploy command instead:_
-`cdk deploy --c selfSignup=True`
+* Deploy the stacks
+`cdk deploy --all`
+
+* _If you want to enable self user sign up (not recommended) use the following deploy command instead:_
+`cdk deploy --all --c selfSignup=True`
+
+### Note on WAF and Region Compatibility
+
+This solution automatically creates two stacks:
+1. **WafStack** in us-east-1 region - Contains the WAF resources for CloudFront
+2. **ChatbotStack** in your default region - Contains all other resources
+
+This approach is necessary because AWS WAF with CloudFront scope is only available in us-east-1, while the main application can be deployed in other regions where Amazon Bedrock is available.
 
 ## Deployment Validation
 
@@ -198,8 +207,8 @@ Also You can integrate this Guidance using the pre-provided lex bot deployment t
 
 * Navigate into the CDK directory.
 `cd source/cdk`
-* Deploy the stack
-`cdk destroy`
+* Destroy all stacks
+`cdk destroy --all`
 
 ## FAQ, known issues, additional considerations, and limitations
 
