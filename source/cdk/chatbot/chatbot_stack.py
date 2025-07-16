@@ -82,10 +82,13 @@ class ChatbotStack(Stack):
         cdk.CfnOutput(self, "AdminPortal", value=admin_portal, description="Admin Portal")
 
     def create_waf(self):
-        # Create a WAFv2 web ACL
-        self.waf_acl = wafv2.CfnWebACL(self, 
+        # Create a WAFv2 web ACL in us-east-1 for CloudFront
+        # Use a cross-region stack for the WAF resources
+        waf_stack = Stack(self, "WafStack", env=cdk.Environment(region="us-east-1"))
+        # Create the WAF ACL in us-east-1
+        waf_acl = wafv2.CfnWebACL(waf_stack,
             "AIBotCFACL",
-                scope="CLOUDFRONT",
+            scope="CLOUDFRONT",
             name="AIBotCFACL",
             description="AIBotCFACL",
             default_action=wafv2.CfnWebACL.DefaultActionProperty(allow={}),
@@ -153,6 +156,8 @@ class ChatbotStack(Stack):
                     }
                 }
             ])
+        # Store the WAF ACL ARN for use in CloudFront
+        self.waf_acl_arn = waf_acl.attr_arn
 
     def create_s3_deployment(self):
         s3deploy.BucketDeployment(self, "DeployWebsite",
@@ -602,7 +607,7 @@ class ChatbotStack(Stack):
             enable_logging=True,
             log_bucket=self.log_cf_bucket,
             log_file_prefix="cf-logs/",
-            web_acl_id= self.waf_acl.attr_arn,
+            web_acl_id=self.waf_acl_arn,  # Use the ARN from the cross-region WAF
             default_behavior=_cf.BehaviorOptions(
                 allowed_methods=_cf.AllowedMethods.ALLOW_ALL,
                 viewer_protocol_policy=_cf.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
