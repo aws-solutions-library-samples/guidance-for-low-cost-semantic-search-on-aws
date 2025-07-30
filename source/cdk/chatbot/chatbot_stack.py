@@ -909,6 +909,13 @@ class ChatbotStack(Stack):
                 actions=["textract:StartDocumentTextDetection","textract:GetDocumentTextDetection"],
                 resources=["*"]
             ))
+        # add ssm:GetParameter
+        self.step1.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["ssm:GetParameter"],
+                resources=["*"]
+            )
+        )
         
         # add permisions to the lambda to be invoked by sns
 
