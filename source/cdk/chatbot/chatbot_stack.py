@@ -979,7 +979,7 @@ class ChatbotStack(Stack):
                 "DYNAMO_TABLE": self.table_conversation.table_name,
                 "DYNAMO_TABLE_TEXTRACT": self.table_chunk_small.table_name,
                 "DYNAMO_TABLE_LLM": self.table_chunk_big.table_name,
-                "TOLERANCE": "0.3",
+                "TOLERANCE": "0.1",
                 "MODEL_ID": "anthropic.claude-3-haiku-20240307-v1:0",
                 "PROMT_SYSTEM_SSM": "aibot_promt_system",
                 "PROMT_CONTEXT_SSM": "aibot_promt_context"
