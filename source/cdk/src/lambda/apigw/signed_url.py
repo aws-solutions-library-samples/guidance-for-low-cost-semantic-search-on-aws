@@ -5,7 +5,7 @@ import json
 import utils
 from botocore.config import Config
 
-config = Config(signature_version='s3v4')
+config = Config(signature_version='s3v4', s3={"addressing_style": "virtual"})
 s3 = boto3.client('s3', config=config)
 
 
