@@ -137,6 +137,8 @@ class PDFProcessor:
 
 def handler(event, context):
     logger.info("Received event: " + json.dumps(event, indent=2))
-    pdf_processor = PDFProcessor()
+    # get the default lambda region
+    region = os.environ.get('AWS_DEFAULT_REGION', 'us-east-1')
+    pdf_processor = PDFProcessor(region=region)
     result = pdf_processor.process_document(event)
     return result

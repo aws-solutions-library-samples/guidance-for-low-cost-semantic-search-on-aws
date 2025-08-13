@@ -899,7 +899,7 @@ class ChatbotStack(Stack):
                 resources=[
                     #"arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3*",
                     # arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-embed-text-v1 
-                    "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-embed-text-v2:0"
+                    "arn:aws:bedrock:*::foundation-model/amazon.titan-embed-text-v2:0"
                 ]
             )
         )
@@ -936,7 +936,7 @@ class ChatbotStack(Stack):
             iam.PolicyStatement(
                 actions=["bedrock:InvokeModel", "ssm:GetParameter"],
                 resources=[
-                    "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude*",]
+                    "arn:aws:bedrock:*::foundation-model/anthropic.claude*",]
             )
         )
         self.step3joiner.add_to_role_policy(
