@@ -1,4 +1,4 @@
-langchain_community==0.3.20
+langchain_community==0.3.27
 boto3==1.37.16
 numpy==1.26.4
 scipy
